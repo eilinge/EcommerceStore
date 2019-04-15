@@ -1,65 +1,194 @@
-pragma solidity ^0.5.0;
+pragma solidity ^ 0.4.25;
 
 contract EcommerceStore {
-    uint productIndex;
-    enum ProductStatus { Open, Sold, Unsold }
-    enum ProductCondition {New, Old }
-    mapping (address => mapping(uint => Product)) stores;
-    mapping (uint => address) productIdInStore;
-    
+    enum ProductStatus {
+        Open,
+        Sold,
+        Unsold
+    }
+    enum ProductCondition {
+        New,
+        Used
+    }
+
+    struct Bid {
+        address bidder;
+        uint productId;
+        uint value;
+        bool revealed;
+    }
+
     struct Product {
-        //商品基本信息
-        uint id;                    //商品编号，全局递增
-        string name;                //商品名称
-        string category;            //商品类别
-        string imageLink;           //商品图片链接地址
-        string descLink;            //商品描述链接地址
-        //拍卖相关信息
-        uint auctionStartTime;      //拍卖开始时间   
-        uint auctionEndTime;        //拍卖截止时间
-        uint startPrice;            //起拍价格
-        address highestBidder;      //出最高价者 
-        uint highestBid;            //最高出价
-        uint secondHighestBid;      //次高出价 
-        uint totalBids;             //投标者人数
-        //商品状态
-        ProductStatus status;       //商品销售状态：拍卖中、售出、未售
-        ProductCondition condition; //品相：新品、二手  
+        uint id;
+        string name;
+        string category;
+        string imageLink;
+        string descLink;
+        uint auctionStartTime;
+        uint auctionEndTime;
+        uint startPrice;
+        address highestBidder;
+        uint highestBid;
+        uint secondHighestBid;
+        uint totalBids;
+        ProductStatus status;
+        ProductCondition condition;
+        mapping(address => mapping(bytes32 => Bid))bids;
     }
-    
-    constructor() public { 
-        productIndex = 0; 
+
+    mapping(address => mapping(uint => Product))stores;
+    mapping(uint => address)productIdInStore;
+    uint public productIndex;
+
+    constructor()public {
+        productIndex = 0;
     }
-    
+
     function addProductToStore(
-        string memory  _name,           //Product.name - 商品名称
-        string memory _category,       //Product.category - 商品类别
-        string memory _imageLink,      //Product.imageLink - 商品图片链接
-        string memory _descLink,       //Product.descLink - 商品描述文本链接
-        uint _auctionStartTime, //Product.auctionStartTime - 拍卖开始时间
-        uint _auctionEndTime,   //Product.auctionEndTime - 拍卖截止时间
-        uint _startPrice,       //Product.startPrice - 起拍价格 
-        uint _productCondition  //Product.productCondition - 商品品相
-    ) public {
-        require (_auctionStartTime < _auctionEndTime);
-        //商品编号计数器递增
+        string _name,
+        string _category,
+        string _imageLink,
+        string _descLink,
+        uint _auctionStartTime,
+        uint _auctionEndTime,
+        uint _startPrice,
+        uint _productCondition
+    )public {
+        require(_auctionStartTime < _auctionEndTime);
         productIndex += 1;
-        //构造Product结构变量
-        Product memory product = Product(productIndex, _name, _category, _imageLink, 
-                            _descLink, _auctionStartTime, _auctionEndTime,
-                            _startPrice, address(0), 0, 0, 0, ProductStatus.Open, 
-                            ProductCondition(_productCondition));
-        //存入商品目录表                   
+        Product memory product = Product(
+            productIndex,
+            _name,
+            _category,
+            _imageLink,
+            _descLink,
+            _auctionStartTime,
+            _auctionEndTime,
+            _startPrice,
+            0,
+            0,
+            0,
+            0,
+            ProductStatus.Open,
+            ProductCondition(_productCondition)
+        );
+
         stores[msg.sender][productIndex] = product;
-        //保存商品反查表
         productIdInStore[productIndex] = msg.sender;
     }
-    function getProduct(uint _productId) view public 
-        returns (uint, string memory , string memory, string memory, string memory, uint, uint, uint, ProductStatus, ProductCondition) {
+
+    function getProduct(uint _productId)view public returns(
+        uint,
+        string,
+        string,
+        string,
+        string,
+        uint,
+        uint,
+        uint,
+        ProductStatus,
+        ProductCondition
+    ) {
         Product memory product = stores[productIdInStore[_productId]][_productId];
-        //按照定义的先后顺序依次返回product结构各成员
-        return (product.id, product.name, product.category, product.imageLink, 
-            product.descLink, product.auctionStartTime,
-            product.auctionEndTime, product.startPrice, product.status, product.condition);
+        return (
+            product.id,
+            product.name,
+            product.category,
+            product.imageLink,
+            product.descLink,
+            product.auctionStartTime,
+            product.auctionEndTime,
+            product.startPrice,
+            product.status,
+            product.condition
+        );
     }
+
+    function bid(uint _productId, bytes32 _bid)payable public returns(bool) {
+        Product storage product = stores[productIdInStore[_productId]][_productId];
+        require(now >= product.auctionStartTime);
+        require(now <= product.auctionEndTime);
+        require(msg.value > product.startPrice);
+        require(product.bids[msg.sender][_bid].bidder == 0);
+
+        product.bids[msg.sender][_bid] = Bid(msg.sender, _productId, msg.value, false);
+        product.totalBids += 1;
+        return true;
+    }
+
+    function stringToUint(string s)pure private returns(uint) {
+        bytes memory b = bytes(s);
+        uint result = 0;
+
+        for (uint i = 0; i < b.length; i++) {
+            if (b[i] >= 48 && b[i] <= 57) {
+                result = result * 10 + (uint(b[i]) - 48);
+            }
+        }
+        return result;
+    }
+
+    function revealBid(uint _productId, string _amount, string _secret)public {
+        Product storage product = stores[productIdInStore[_productId]][_productId];
+        require(now > product.auctionEndTime);
+        bytes32 sealedBid = keccak256(abi.encodePacked(_amount, _secret));
+        Bid memory bidInfo = product.bids[msg.sender][sealedBid];
+
+        require(bidInfo.bidder > 0);
+        require(bidInfo.revealed == false);
+
+        uint refund;
+        uint amount = stringToUint(_amount);
+
+        if (bidInfo.value < amount) {
+            refund = bidInfo.value;
+        } else {
+            if (address(product.highestBidder) == 0) {
+                product.highestBidder = msg.sender;
+                product.highestBid = amount;
+                product.secondHighestBid = product.startPrice;
+                refund = bidInfo.value - amount;
+            } else {
+                if (amount > product.highestBid) {
+                    product.secondHighestBid = product.highestBid;
+                    product
+                        .highestBidder
+                        .transfer(product.highestBid);
+                    product.highestBidder = msg.sender;
+                    product.highestBid = amount;
+                    refund = bidInfo.value - amount;
+                } else if (amount > product.secondHighestBid) {
+                    product.secondHighestBid = amount;
+                    refund = amount;
+                } else {
+                    refund = amount;
+                }
+            }
+        }
+
+        product
+            .bids[msg.sender][sealedBid]
+            .revealed = true;
+
+        if (refund > 0) {
+            msg
+                .sender
+                .transfer(refund);
+        }
+    }
+
+    function highestBidderInfo(uint _productId)view public returns(
+        address,
+        uint,
+        uint
+    ) {
+        Product memory product = stores[productIdInStore[_productId]][_productId];
+        return (product.highestBidder, product.highestBid, product.secondHighestBid);
+    }
+
+    function totalBids(uint _productId)view public returns(uint) {
+        Product memory product = stores[productIdInStore[_productId]][_productId];
+        return product.totalBids;
+    }
+
 }
