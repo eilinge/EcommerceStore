@@ -1,4 +1,4 @@
-pragma solidity ^ 0.4.25;
+pragma solidity ^0.4.18;
 
 contract EcommerceStore {
     enum ProductStatus {
@@ -65,7 +65,7 @@ contract EcommerceStore {
             _auctionStartTime,
             _auctionEndTime,
             _startPrice,
-            0,
+            address(0),
             0,
             0,
             0,
@@ -109,7 +109,7 @@ contract EcommerceStore {
         require(now >= product.auctionStartTime);
         require(now <= product.auctionEndTime);
         require(msg.value > product.startPrice);
-        require(product.bids[msg.sender][_bid].bidder == 0);
+        require(product.bids[msg.sender][_bid].bidder == address(0));
 
         product.bids[msg.sender][_bid] = Bid(msg.sender, _productId, msg.value, false);
         product.totalBids += 1;
@@ -134,7 +134,7 @@ contract EcommerceStore {
         bytes32 sealedBid = keccak256(abi.encodePacked(_amount, _secret));
         Bid memory bidInfo = product.bids[msg.sender][sealedBid];
 
-        require(bidInfo.bidder > 0);
+        require(bidInfo.bidder > address(0));
         require(bidInfo.revealed == false);
 
         uint refund;
@@ -190,5 +190,4 @@ contract EcommerceStore {
         Product memory product = stores[productIdInStore[_productId]][_productId];
         return product.totalBids;
     }
-
 }
