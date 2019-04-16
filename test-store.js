@@ -1,4 +1,12 @@
-EcommerceStore = artifacts.require("./contracts/EcommerceStore.sol");
+// EcommerceStore = artifacts.require("./contracts/EcommerceStore.sol");
+const Web3 = require('web3')
+const contract = require('truffle-contract')
+const ecommerce_store_artifacts = require('./build/contracts/EcommerceStore.json')
+
+const provider = new Web3.providers.HttpProvider("http://localhost:8545");
+const EcommerceStore = contract(ecommerce_store_artifacts);
+EcommerceStore.setProvider(provider);
+
 Eutil = require('ethereumjs-util');
 
 module.exports = function (callback) {
