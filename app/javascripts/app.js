@@ -36,9 +36,6 @@ window.App = {
             $("#product-image").change(event => {
                 if (event.target.files.length === 0) return
                 const file = event.target.files[0]
-                // FileReader 对象允许Web应用程序异步读取存储在用户计算机上的文件（或原始数据缓冲区）的内容，
-                // 使用 File 或 Blob 对象指定要读取的文件或数据。
-                // 开始读取指定的 Blob中的内容, 一旦完成, result 属性中保存的将是被读取文件的 ArrayBuffer 数据对象.
                 reader = new window.FileReader()
                 reader.readAsArrayBuffer(file)
             });
@@ -48,16 +45,103 @@ window.App = {
                 const req = $("#add-item-to-store").serialize();
                 let params = JSON.parse('{"' + req.replace(/"/g, '\\"').replace(/&/g, '","').replace(/=/g, '":"') + '"}');
                 let decodedParams = {}
-                //  返回对象的可枚举属性和方法的名称。
                 Object.keys(params)
                     .forEach(k => decodedParams[k] = decodeURIComponent(decodeURI(params[k])))
                 saveProduct(reader, decodedParams);
             })
         }
+
+        if ($("#product-page").length > 0) {
+            let productId = new URLSearchParams(window.location.search).get('id');
+            if (!productId) return $('#msg').html('ERROR: no product id specified.').show();
+            renderProductDetails(productId);
+
+            $("#bidding").submit(function (event) {
+                event.preventDefault();
+                $("#msg").hide();
+                let amount = $("#bid-amount").val();
+                let sendAmount = $("#bid-send-amount").val();
+                let secretText = $("#secret-text").val();
+                let sealedBid = '0x' + ethUtil.sha3(web3.toWei(amount, 'ether') + secretText).toString('hex');
+                let productId = $("#product-id").val();
+
+                EcommerceStore.deployed()
+                    .then(inst => inst.bid(parseInt(productId), sealedBid, {
+                        value: web3.toWei(sendAmount),
+                        from: web3.eth.accounts[1],
+                        gas: 440000
+                    }))
+                    .then(ret => {
+                        $("#msg").html("Your bid has been successfully submitted!");
+                        $("#msg").show();
+                    })
+                    .catch(err => console.log(err))
+            });
+
+            $("#revealing").submit(function (event) {
+                event.preventDefault();
+                $("#msg").hide();
+                let amount = $("#actual-amount").val();
+                let secretText = $("#reveal-secret-text").val();
+                let productId = $("#product-id").val();
+                EcommerceStore.deployed()
+                    .then(inst => inst.revealBid(parseInt(productId), web3.toWei(amount).toString(), secretText, {
+                        from: web3.eth.accounts[1],
+                        gas: 440000
+                    }))
+                    .then(ret => {
+                        $("#msg").show();
+                        $("#msg").html("Your bid has been successfully revealed!");
+                    })
+                    .catch(err => console.log(err))
+            });
+
+            $("#finalize-auction").submit(function (event) {
+                event.preventDefault();
+                $("#msg").hide();
+                let productId = $("#product-id").val();
+                EcommerceStore.deployed()
+                    .then(inst => inst.finalizeAuction(parseInt(productId), {
+                        from: web3.eth.accounts[9],
+                        gas: 4400000
+                    }))
+                    .then(ret => {
+                        $("#msg").show();
+                        $("#msg").html("The auction has been finalized and winner declared.");
+                        //location.reload();
+                    })
+                    .catch(err => console.log(err))
+            });
+
+            $(".release-funds").click(function () {
+                let productId = new URLSearchParams(window.location.search).get('id');
+                let account = $(this).data('account')
+                EcommerceStore.deployed()
+                    .then(inst => inst.releaseAmountToSeller(productId, {
+                        from: account,
+                        gas: 440000
+                    }))
+                    .then(() => $("#msg").html("Your transaction has been submitted. Please wait for few seconds for the confirmation").show())
+                    .catch(err => console.log(err))
+            });
+
+            $(".refund-funds").click(function () {
+                let productId = new URLSearchParams(window.location.search).get('id');
+                let account = $(this).data('account')
+                EcommerceStore.deployed()
+                    .then(f => f.refundAmountToBuyer(productId, {
+                        from: account,
+                        gas: 440000
+                    }))
+                    .then(() => $("#msg").html("Your transaction has been submitted. Please wait for few seconds for the confirmation").show())
+                    .catch(err => console.log(err))
+            });
+
+        }
+
     }
 };
 
-// 添加"load"事件, 窗口加载时, 调用函数
 window.addEventListener('load', function () {
     window.web3 = new Web3(new Web3.providers.HttpProvider(ethereumNodeUrl));
     App.start();
@@ -67,18 +151,16 @@ function renderStore() {
     let inst
     return EcommerceStore.deployed()
         .then(i => inst = i)
-        .then(() => inst.productIndex())  // 无需参数, 直接调用函数, 得到返回值, 再进行传递
+        .then(() => inst.productIndex())
         .then(next => {
             for (let id = 1; id <= next; id++) {
                 inst.getProduct.call(id)
-                    // 渲染页面
                     .then(p => $("#product-list").append(buildProduct(p)))
             }
         })
 }
 
 function buildProduct(product) {
-    // EC6 读取数据, 写入到html中
     let imgUrl = `${ipfsGatewayUrl}/ipfs/${product[3]}`
     let html = `<div>
                 <img src="${imgUrl}" width="150px" />
@@ -88,32 +170,11 @@ function buildProduct(product) {
                 <div>${product[6]}</div>
                 <div>Eether ${product[6]}</div>
               </div>`
-    return $(html);
+    return $(html)
+        .css('cursor', 'pointer')
+        .click(() => location.href = `/product.html?id=${product[0]}`);
 }
 
-/*
-Buffer(缓冲区)
-    JavaScript 语言自身只有字符串数据类型， 没有二进制数据类型。
-    但在处理像TCP流或文件流时， 必须使用到二进制数据
-
-Buffer 实例一般用于表示编码字符的序列， 比如 UTF - 8、 UCS2、 Base64、 或十六进制编码的数据。 
-通过使用显式的字符编码， 就可以在 Buffer 实例与普通的 JavaScript 字符串之间进行相互转换。
-
-创建Buffer类
-    Buffer.from(array)： 返回一个被 array 的值初始化的新的 Buffer 实例（ 传入的 array 的元素只能是数字， 不然就会自动被 0 覆盖）
-    Buffer.from(arrayBuffer[, byteOffset[, length]])： 返回一个新建的与给定的 ArrayBuffer 共享同一内存的 Buffer。
-    Buffer.from(buffer)： 复制传入的 Buffer 实例的数据， 并返回一个新的 Buffer 实例
-    Buffer.from(string[, encoding])： 返回一个被 string 的值初始化的新的 Buffer 实例
-
-写入
-    buf.write(string[, offset[, length]][, encoding])
-读取
-    buf.toString([encoding[, start[, end]]]) / buf.toJSON()
-合并
-    Buffer.concat(list[, totalLength])
-比较
-    buf.compare(otherBuffer);
-*/
 function saveImageOnIpfs(reader) {
     const buffer = Buffer.from(reader.result);
     return ipfs.add(buffer)
@@ -128,12 +189,6 @@ function saveTextBlobOnIpfs(blob) {
         .catch(err => console.error(err))
 }
 
-// Date.parse()函数用于分析一个包含日期的字符串，并返回该日期与 1970 年 1 月 1 日午夜之间相差的毫秒数。
-/*
-处理整数的时候parseInt() 更常用。 parseInt() 函数在转换字符串时， 会忽略字符串前面的空格， 知道找到第一个非空格字符。
-如果第一个字符不是数字或者负号， parseInt() 就会返回NaN， 同样的， 用parseInt() 转换空字符串也会返回NaN。
-如果第一个字符是数字字符， parseInt() 会继续解析第二个字符， 直到解析完所有后续字符串或者遇到了一个非数字字符。
-*/
 function saveProductToBlockchain(params, imageId, descId) {
     let auctionStartTime = Date.parse(params["product-auction-start"]) / 1000;
     let auctionEndTime = auctionStartTime + parseInt(params["product-auction-end"]) * 24 * 60 * 60
@@ -160,5 +215,104 @@ function saveProduct(reader, decodedParams) {
         .then(() => saveTextBlobOnIpfs(decodedParams["product-description"]))
         .then(id => descId = id)
         .then(() => saveProductToBlockchain(decodedParams, imageId, descId))
+        .catch(err => console.log(err))
+}
+
+function displayPrice(amt) {
+    return 'Ξ' + web3.fromWei(amt, 'ether');
+}
+
+function getCurrentTimeInSeconds() {
+    return Math.round(new Date() / 1000);
+}
+
+function displayEndHours(seconds) {
+    let current_time = getCurrentTimeInSeconds()
+    let remaining_seconds = seconds - current_time;
+
+    if (remaining_seconds <= 0) {
+        return "Auction has ended";
+    }
+
+    let days = Math.trunc(remaining_seconds / (24 * 60 * 60));
+    remaining_seconds -= days * 24 * 60 * 60
+    let hours = Math.trunc(remaining_seconds / (60 * 60));
+    remaining_seconds -= hours * 60 * 60
+    let minutes = Math.trunc(remaining_seconds / 60);
+    if (days > 0) {
+        return "Auction ends in " + days + " days, " + hours + ", hours, " + minutes + " minutes";
+    } else if (hours > 0) {
+        return "Auction ends in " + hours + " hours, " + minutes + " minutes ";
+    } else if (minutes > 0) {
+        return "Auction ends in " + minutes + " minutes ";
+    } else {
+        return "Auction ends in " + remaining_seconds + " seconds";
+    }
+}
+
+function renderProductDetails(productId) {
+    EcommerceStore.deployed()
+        .then(inst => inst.getProduct.call(productId))
+        .then(p => {
+            let content = "";
+            ipfs.cat(p[4])
+                .then(function (file) {
+                    content = file.toString();
+                    $("#product-desc").append(`<div>${content}</div>`);
+                })
+                .catch(err => console.log(err))
+
+            $("#product-image").append(`<img src='${ipfsGatewayUrl}/ipfs/${p[3]}' width='250px'/>`);
+            $("#product-price").html(displayPrice(p[7]));
+            $("#product-name").html(p[1]);
+            $("#product-auction-end").html(displayEndHours(p[6]));
+            $("#product-id").val(p[0]);
+
+            let currentTime = getCurrentTimeInSeconds();
+            $("#revealing, #bidding,#finalize-auction,#escrow-info").hide();
+            if (parseInt(p[8]) == 1) {
+                EcommerceStore.deployed()
+                    .then(inst => {
+                        $("#escrow-info").show();
+                        inst.highestBidderInfo.call(productId)
+                            .then(f => {
+                                if (f[2].toLocaleString() == '0') {
+                                    $("#product-status").html("Auction has ended. No bids were revealed");
+                                } else {
+                                    $("#product-status").html("Auction has ended. Product sold to " + f[0] + " for " + displayPrice(f[2]) +
+                                        "The money is in the escrow. Two of the three participants (Buyer, Seller and Arbiter) have to " +
+                                        "either release the funds to seller or refund the money to the buyer");
+                                }
+                            })
+
+                        inst.escrowInfo.call(productId)
+                            .then(f => {
+                                $("#buyer").html('Buyer: ' + f[0]);
+                                $("#seller").html('Seller: ' + f[1]);
+                                $("#arbiter").html('Arbiter: ' + f[2]);
+                                $("#buyer-vote a").data('account', f[0])
+                                console.log($("#buyer-vote a")[0], f[0])
+                                $("#seller-vote a").data('account', f[1])
+                                $("#arbiter-vote a").data('account', f[2])
+                                if (f[3] == true) {
+                                    $("#release-count").html("Amount from the escrow has been released");
+                                } else {
+                                    $("#release-count").html(f[4] + " of 3 participants have agreed to release funds");
+                                    $("#refund-count").html(f[5] + " of 3 participants have agreed to refund the buyer");
+                                }
+                            })
+
+                    })
+            } else if (parseInt(p[8]) == 2) {
+                $("#product-status").html("Product was not sold");
+            } else if (currentTime < parseInt(p[6])) {
+                $("#bidding").show();
+            } else if (currentTime < (parseInt(p[6]) + 60)) {
+                $("#revealing").show();
+            } else {
+                $("#finalize-auction").show();
+            }
+
+        })
         .catch(err => console.log(err))
 }

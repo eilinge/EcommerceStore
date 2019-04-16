@@ -17,7 +17,11 @@ module.exports = {
       {
         from: './app/list-item.html',
         to: "list-item.html"
-      }
+      },
+      {
+        from: './app/product.html',
+        to: "product.html"
+      },
     ]),
     new webpack.DefinePlugin({
       ETHEREUM_NODE_URL: JSON.stringify(process.env.ETHEREUM_NODE_URL),
@@ -46,9 +50,9 @@ module.exports = {
       }
     ]
   },
-  devServer: { //开发服务器配置对象
-    host: '0.0.0.0', //在所有ip上进行监听 
-    disableHostCheck: true, //禁止主机检查
-    public: '0.0.0.0' //公开访问地址
+  devServer: {
+    host: '0.0.0.0',
+    disableHostCheck: true,
+    public: '0.0.0.0'
   }
 }

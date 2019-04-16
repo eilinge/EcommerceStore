@@ -1,5 +1,7 @@
 pragma solidity ^0.4.18;
 
+import "./Escrow.sol";
+
 contract EcommerceStore {
     enum ProductStatus {
         Open,
@@ -39,6 +41,8 @@ contract EcommerceStore {
     mapping(address => mapping(uint => Product))stores;
     mapping(uint => address)productIdInStore;
     uint public productIndex;
+
+    mapping(uint => address) productEscrow;
 
     constructor()public {
         productIndex = 0;
@@ -143,7 +147,7 @@ contract EcommerceStore {
         if (bidInfo.value < amount) {
             refund = bidInfo.value;
         } else {
-            if (address(product.highestBidder) == 0) {
+            if (product.highestBidder == address(0)) {
                 product.highestBidder = msg.sender;
                 product.highestBid = amount;
                 product.secondHighestBid = product.startPrice;
@@ -151,9 +155,7 @@ contract EcommerceStore {
             } else {
                 if (amount > product.highestBid) {
                     product.secondHighestBid = product.highestBid;
-                    product
-                        .highestBidder
-                        .transfer(product.highestBid);
+                    product.highestBidder.transfer(product.highestBid);
                     product.highestBidder = msg.sender;
                     product.highestBid = amount;
                     refund = bidInfo.value - amount;
@@ -166,14 +168,10 @@ contract EcommerceStore {
             }
         }
 
-        product
-            .bids[msg.sender][sealedBid]
-            .revealed = true;
+        product.bids[msg.sender][sealedBid].revealed = true;
 
         if (refund > 0) {
-            msg
-                .sender
-                .transfer(refund);
+            msg.sender.transfer(refund);
         }
     }
 
@@ -189,5 +187,50 @@ contract EcommerceStore {
     function totalBids(uint _productId)view public returns(uint) {
         Product memory product = stores[productIdInStore[_productId]][_productId];
         return product.totalBids;
+    }
+
+    function finalizeAuction(uint _productId)public {
+        //根据商品编号提取商品数据
+        Product storage product = stores[productIdInStore[_productId]][_productId];
+        //该商品的拍卖应该已经截止
+        require(now > product.auctionEndTime);
+        //该商品为首次拍卖，之前也没有流拍
+        require(product.status == ProductStatus.Open);
+        //方法的调用者是不是胜出的买家
+        require(product.highestBidder != msg.sender);
+        //调用者也不是卖家
+        require(productIdInStore[_productId] != msg.sender);
+
+        if (product.totalBids == 0) { //没有人参与竞价，流拍
+            product.status = ProductStatus.Unsold; //将商品标记为”未售出“
+        } else {
+            //创建托管合约实例并按照次高出价将赢家资金转入托管合约
+            Escrow escrow = (new Escrow).value(product.secondHighestBid)(
+                _productId,
+                product.highestBidder,  // buyer
+                productIdInStore[_productId],  // seller
+                msg.sender  // 第三方托管
+            );
+            //记录托管合约实例的地址
+            productEscrow[_productId] = address(escrow);
+            //将商品标记为已售出
+            product.status = ProductStatus.Sold;
+            //计算赢家的保证金余额并原路返还
+            uint refund = product.highestBid - product.secondHighestBid;
+            product.highestBidder.transfer(refund);
+        }
+    }
+
+    function releaseAmountToSeller(uint _productId)public {
+        Escrow(productEscrow[_productId]).releaseAmountToSeller(msg.sender);
+    }
+
+    function refundAmountToBuyer(uint _productId)public {
+        Escrow(productEscrow[_productId]).refundAmountToBuyer(msg.sender);
+    }
+
+    function escrowInfo(uint _productId)view public
+    returns(address, address, address, bool, uint, uint) {
+        return Escrow(productEscrow[_productId]).escrowInfo();
     }
 }
