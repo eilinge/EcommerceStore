@@ -14,5 +14,5 @@ app.get('/api/product', (req, rsp) => {
 })
 
 app.listen(8080, function () {
-    console.log('Ebay dapp server listening on port 8080!');
+    console.log('Ebay dapp server listening on port 8080');
 });

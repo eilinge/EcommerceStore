@@ -1,12 +1,4 @@
-// EcommerceStore = artifacts.require("./contracts/EcommerceStore.sol");
-const Web3 = require('web3')
-const contract = require('truffle-contract')
-const ecommerce_store_artifacts = require('./build/contracts/EcommerceStore.json')
-
-const provider = new Web3.providers.HttpProvider("http://localhost:8545");
-const EcommerceStore = contract(ecommerce_store_artifacts);
-EcommerceStore.setProvider(provider);
-
+EcommerceStore = artifacts.require("./EcommerceStore.sol");
 Eutil = require('ethereumjs-util');
 
 module.exports = function (callback) {
@@ -15,8 +7,8 @@ module.exports = function (callback) {
 
     EcommerceStore.deployed()
         .then(inst => {
-            inst.addProductToStore('iphone 6', 'Cell Phones & Accessories', 'imagelink',
-                    'desclink', current_time, current_time + 60, amt_1, 0)
+            inst.addProductToStore('iphone 6', 'Cell Phones & Accessories', 'QmXbD3unmtFcWTrWc3ewdfkrkbTwiVjfkUw8YkaSA5ri3Q',
+                    'QmYvDgKz3mxF2KtvagFm65FCCxehKBKmfpuN97QJeR4KtD', current_time, current_time + 60, amt_1, 0)
                 .then(() => inst.productIndex())
                 .then(lastid => inst.getProduct(lastid))
                 .then(product => console.log(product))

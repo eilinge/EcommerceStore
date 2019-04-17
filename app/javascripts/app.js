@@ -19,7 +19,8 @@ const ipfsApiAddress = {
     host: IPFS_API_HOST ? IPFS_API_HOST : 'localhost',
     port: IPFS_API_PORT ? IPFS_API_PORT : 5001
 }
-const ipfsGatewayUrl = IPFS_GATEWAY_URL ? IPFS_GATEWAY_URL : 'http://localhost:8080'
+// const ipfsGatewayUrl = IPFS_GATEWAY_URL ? IPFS_GATEWAY_URL : 'http://localhost:8080'
+const ipfsGatewayUrl = IPFS_GATEWAY_URL ? IPFS_GATEWAY_URL : 'http://localhost:5000'
 
 const EcommerceStore = contract(ecommerce_store_artifacts);
 const ipfs = ipfsAPI(ipfsApiAddress);
@@ -63,7 +64,7 @@ window.App = {
                 let amount = $("#bid-amount").val();
                 let sendAmount = $("#bid-send-amount").val();
                 let secretText = $("#secret-text").val();
-                let sealedBid = '0x' + ethUtil.sha3(web3.toWei(amount, 'ether') + secretText).toString('hex');
+                let sealedBid = '0x' + ethUtil.keccak256(web3.toWei(amount, 'ether') + secretText).toString('hex');
                 let productId = $("#product-id").val();
 
                 EcommerceStore.deployed()
@@ -163,6 +164,7 @@ function renderStore() {
 
 function buildProduct(product) {
     let imgUrl = `${ipfsGatewayUrl}/ipfs/${product[3]}`
+    console.dir(imgUrl)
     let html = `<div>
                 <img src="${imgUrl}" width="150px" />
                 <div>${product[1]}</div>

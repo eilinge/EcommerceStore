@@ -1,0 +1,25 @@
+refer to plugs
+
+Ipfs
+    安装IPFS
+    wget https://dist.ipfs.io/go-ipfs/v0.4.13/go-ipfs_v0.4.13_linux-amd64.tar.gz
+    tar xzvf go-ipfs_v0.4.13_linux-386.tar.gz 
+    echo "export PATH=$HOME/go-ipfs:$PATH" >> .bashrc
+    source .bashrc
+
+    节点配置
+
+    IPFS节点软件提供了REST API接口，默认在本地5001端口监听。由于我们将在 其他机器的浏览器中通过AJAX访问这个API，
+    因此需要配置监听地址和CORS（跨域资源共享）：
+
+    ~$ ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '["*"]'
+    ~$ ipfs config --json Addresses.API '"/ip4/0.0.0.0/tcp/5001"'
+    IPFS节点软件也提供了一个网关，让我们可以通过HTTP协议访问IPFS网络中的文件。由于 网关默认监听8080端口，
+    我们将其设置为5000，从而避免和课程项目中的web服务器冲突：
+
+    ~$ ipfs config --json Addresses.Gateway '"/ip4/0.0.0.0/tcp/5000"'
+    加入IPFS网络
+
+    IPFS节点软件的监听器负责和IPFS网络中的其他节点通信，执行daemon命令来启动监听器：
+
+    ~$ ipfs daemon
