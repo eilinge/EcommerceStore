@@ -23,3 +23,19 @@ Ipfs
     IPFS节点软件的监听器负责和IPFS网络中的其他节点通信，执行daemon命令来启动监听器：
 
     ~$ ipfs daemon
+
+Infura 免费托管
+    1、不必运行自己的ipfs 节点，可以使用infura的ipfs公共节点
+
+    在app.js文件中，将ipfs的连接地址从 localhost 替换为 Infura地址：
+    const ipfs = ipfsAPI({host: 'ipfs.infura.io', port: '5001', protocol: 'http'})
+    
+    2、不必运行自己的以太坊节点，可以使用infura的以太坊公共节点
+
+    首先在Infura上免费注册，然后利用infura的API key来更新 app.js中的web3连接地址， 将其从 localhost 更新为 Infura提供的地址，就像下面这样：
+    window.web3 = new Web3(new Web3.providers.HttpProvider("https://ropsten.infura.io/API_KEY"));
+    可能会有一些没有安装Metamask的用户访问你的应用。这时不要什么都不显示，至少将产品显示出来。
+
+    3、打包项目的JS和HTML文件，部署到 web 服务器
+
+    在项目目录下运行 webpack 即可，它会将所有的 js 和 HTML 文件输出到build目录。 将build目录的内容拷贝到 web 服务器，其他人就可以访问你的 DApp 了！
