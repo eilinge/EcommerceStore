@@ -6,7 +6,8 @@ const setupProductEventListener = require('./lib/event-listener')
 setupProductEventListener()
 
 app.use(express.static(__dirname + '/build'))
-
+var eilinge = "daf"
+debugger
 app.get('/api/product', (req, rsp) => {
     Product.findProduct(req.query)
         .then(ret => rsp.send(ret))

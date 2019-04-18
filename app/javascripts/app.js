@@ -14,11 +14,13 @@ import ethUtil from 'ethereumjs-util'
 import $ from 'jquery'
 
 const ethereumNodeUrl = ETHEREUM_NODE_URL ? ETHEREUM_NODE_URL : 'http://localhost:8545'
+// setting API of ipfs/desc
 const ipfsApiAddress = {
     protocol: 'http',
     host: IPFS_API_HOST ? IPFS_API_HOST : 'localhost',
     port: IPFS_API_PORT ? IPFS_API_PORT : 5001
 }
+// setting Gateway of images url
 // const ipfsGatewayUrl = IPFS_GATEWAY_URL ? IPFS_GATEWAY_URL : 'http://localhost:8080'
 const ipfsGatewayUrl = IPFS_GATEWAY_URL ? IPFS_GATEWAY_URL : 'http://localhost:5000'
 
@@ -29,7 +31,7 @@ let reader;
 window.App = {
     start: function () {
         EcommerceStore.setProvider(web3.currentProvider);
-
+        
         if ($("#index-page").length > 0) {
             renderStore()
         }
@@ -146,6 +148,7 @@ window.App = {
 
 window.addEventListener('load', function () {
     window.web3 = new Web3(new Web3.providers.HttpProvider(ethereumNodeUrl));
+    
     App.start();
 });
 
@@ -164,7 +167,6 @@ function renderStore() {
 
 function buildProduct(product) {
     let imgUrl = `${ipfsGatewayUrl}/ipfs/${product[3]}`
-    console.dir(imgUrl)
     let html = `<div>
                 <img src="${imgUrl}" width="150px" />
                 <div>${product[1]}</div>
